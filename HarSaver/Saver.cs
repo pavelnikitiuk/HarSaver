@@ -37,10 +37,6 @@ namespace HarSaver
             }
         }
 
-        
-
-
-
 
         public void Load(string json)
         {
@@ -56,10 +52,10 @@ namespace HarSaver
 
         }
 
+
+
         public IEnumerable<string> TryToReload()
         {
-
-
             foreach (var entrie in loadFailed.ToList())
             {
                 bool hasLoad = true;
@@ -70,32 +66,22 @@ namespace HarSaver
                     var fileFloder = Path.GetDirectoryName(filePath);
                     if (!Directory.Exists(filePath))
                         Directory.CreateDirectory(fileFloder);
-                    if (Path.GetExtension(filePath) == String.Empty)
-                    {
-                        var name = CreateFileName(entrie);
-                        if (name == String.Empty)
-                            continue;
-                        filePath += name;
-                    }
+                    if (!AddExtension(ref filePath, entrie))
+                        continue;
                     LoadUrl(entrie.Request.Url, filePath);
 
                     loadFailed.Remove(entrie);
                 }
                 catch (WebException)
                 {
-
                     hasLoad = false;
                 }
-
-
                 yield return hasLoad ? filePath : String.Empty;
-
-
             }
             yield break;
-
-
         }
+        
+
 
         public void SaveInFloder(string path)
         {
@@ -106,31 +92,29 @@ namespace HarSaver
 
             this.path = path.Trim('\\');
 
-
+            //iligal chars in file name or path
             illegalPathRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidPathChars()) + "*")));
-            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars())+"*")));
+            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars()) + "*")));
 
-
+            
             foreach (var entrie in document.Log.Entries)
             {
+                //if doesnt load
                 if (entrie.Response.Status > 399 || entrie.Response.Status < 100)
                 {
                     loadFailed.Add(entrie);
                     continue;
                 }
+                //convert url path to file path
                 var filePath = AssembleFilePath(entrie.Request.Url);
 
-                if (Path.GetExtension(filePath) == String.Empty)
+                //create directory if it isnt exist
+                if (!AddExtension(ref filePath, entrie))
                 {
-                    var fileName = CreateFileName(entrie);
-                    if (fileName == String.Empty)
-                    {
-                        loadFailed.Add(entrie);
-                        continue;
-                    }
-                    filePath += fileName;
+                    loadFailed.Add(entrie);
+                    continue;
                 }
-
+                //delete all ilegal chars
                 filePath = illegalPathRegex.Replace(filePath, "");
 
                 Save(filePath, entrie);
@@ -206,29 +190,39 @@ namespace HarSaver
         }
         private void SaveFile(string path, string content)
         {
-            File.WriteAllText(path, content);
+            File.WriteAllText(path, content, Encoding.UTF8);
         }
 
         private string AssembleFilePath(string url)
         {
             var uriPath = new Uri(url);
 
-            StringBuilder localPath = new StringBuilder();
+            //StringBuilder localPath = new StringBuilder();
+            var localPath = new string[2 + uriPath.Segments.Length];
+            localPath[0] = path;
 
-            localPath.Append(path);
-            localPath.Append('\\');
-            localPath.Append(uriPath.Host);
+            localPath[1] = uriPath.Host;
             for (int i = 0; i < uriPath.Segments.Length; i++)
             {
                 var segment = uriPath.Segments[i].Replace('/', '\\');
                 if (uriPath.Segments[i].Length > 30)
                     segment = segment.Substring(0, 30);
-                localPath.Append(segment);
+                localPath[2 + i] = segment;
             }
 
-            return localPath.ToString();
+            return String.Join("\\", localPath);// .ToString();
         }
 
+        private bool AddExtension(ref string filePath, Entrie entrie)
+        {
+            if (Path.GetExtension(filePath) != String.Empty)
+                return true;
+            var fileName = CreateFileName(entrie);
+            if (fileName == String.Empty)
+                return false;
+            filePath += fileName;
+            return true;
+        }
         #endregion
     }
 }

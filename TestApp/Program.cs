@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using HarSaver;
-//using HarSaver.Models;
 using System.Drawing;
 using System.IO;
 namespace TestApp
