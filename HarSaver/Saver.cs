@@ -93,8 +93,8 @@ namespace HarSaver
             this.path = path.Trim('\\');
 
             //iligal chars in file name or path
-            illegalPathRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidPathChars()) + "*")));
-            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars()) + "*")));
+            illegalPathRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidPathChars()) )));
+            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars()) )));
 
             
             foreach (var entrie in document.Log.Entries)
@@ -108,7 +108,7 @@ namespace HarSaver
                 //convert url path to file path
                 var filePath = AssembleFilePath(entrie.Request.Url);
 
-                //create directory if it isnt exist
+                
                 if (!AddExtension(ref filePath, entrie))
                 {
                     loadFailed.Add(entrie);
@@ -157,11 +157,9 @@ namespace HarSaver
                         name = ExtractTitle(entrie.Response.Content.Text);
                         extension = ".html";
                     }
-
                     else
                         return String.Empty;
                     break;
-
                 case "text/javascript":
                     name = "";
                     extension = ".js";
