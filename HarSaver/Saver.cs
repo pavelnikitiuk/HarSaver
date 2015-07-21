@@ -56,31 +56,33 @@ namespace HarSaver
 
         public IEnumerable<string> TryToReload()
         {
-            foreach (var entrie in loadFailed.ToList())
+            var reloadFailed = new List<Entrie>();
+            foreach (var entrie in loadFailed)
             {
                 bool hasLoad = true;
                 string filePath = "";
                 try
                 {
-                    filePath = AssembleFilePath(entrie.Request.Url);
-                    var fileFloder = Path.GetDirectoryName(filePath);
-                    if (!Directory.Exists(filePath))
-                        Directory.CreateDirectory(fileFloder);
-                    if (!AddExtension(ref filePath, entrie))
-                        continue;
-                    LoadUrl(entrie.Request.Url, filePath);
+                    var data = LoadFromUrl(entrie.Request.Url);
 
-                    loadFailed.Remove(entrie);
+                    filePath = CreatePath(entrie);
+                    CreateDirectory(filePath);
+                    if (filePath == String.Empty)
+                        filePath = path + "\\" + entrie.Time;
+
+                    File.WriteAllBytes(filePath, data);
                 }
                 catch (WebException)
                 {
+                    reloadFailed.Add(entrie);
                     hasLoad = false;
                 }
                 yield return hasLoad ? filePath : String.Empty;
             }
+            loadFailed = reloadFailed;
             yield break;
         }
-        
+
 
 
         public void SaveInFloder(string path)
@@ -93,57 +95,90 @@ namespace HarSaver
             this.path = path.Trim('\\');
 
             //iligal chars in file name or path
-            illegalPathRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidPathChars()) )));
-            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars()) )));
+            illegalPathRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidPathChars()))));
+            illegalFileRegex = new Regex(string.Format("[{0}]", Regex.Escape(new string(Path.GetInvalidFileNameChars()))));
 
-            
+
             foreach (var entrie in document.Log.Entries)
             {
-                //if doesnt load
+                //check code
                 if (entrie.Response.Status > 399 || entrie.Response.Status < 100)
                 {
                     loadFailed.Add(entrie);
                     continue;
                 }
-                //convert url path to file path
-                var filePath = AssembleFilePath(entrie.Request.Url);
 
-                
-                if (!AddExtension(ref filePath, entrie))
+                if (!SaveFile(entrie))
                 {
                     loadFailed.Add(entrie);
                     continue;
                 }
-                //delete all ilegal chars
-                filePath = illegalPathRegex.Replace(filePath, "");
-
-                Save(filePath, entrie);
             }
         }
         #region PrivateMetods
 
-        private void Save(string filePath, Entrie entrie)
+        private bool SaveFile(Entrie entrie)
         {
-            var floderPath = Path.GetDirectoryName(filePath);
+            var filePath = CreatePath(entrie);
 
-            if (!Directory.Exists(floderPath))
-                Directory.CreateDirectory(floderPath);
+            if (filePath == String.Empty)
+                return false;
 
+            CreateDirectory(filePath);
             if (entrie.Response.Content.Text != null)
                 if (entrie.Response.Content.Encoding == null)
                     SaveFile(filePath, entrie.Response.Content.Text);
                 else
                     SaveByte(filePath, entrie.Response.Content.Text);
+            return true;
         }
 
-        private void LoadUrl(string url, string filePath)
+        private static void CreateDirectory(string filePath)
         {
-            using (var myWebClient = new WebClient())
-            {
-                myWebClient.Headers["User-Agent"] = "MOZILLA/5.0 (WINDOWS NT 6.1; WOW64) APPLEWEBKIT/537.1 (KHTML, LIKE GECKO) CHROME/21.0.1180.75 SAFARI/537.1";
-                myWebClient.DownloadFile(url, filePath);
-            }
+            var directoryPath = Path.GetDirectoryName(filePath);
+            if (!Directory.Exists(directoryPath))
+                Directory.CreateDirectory(directoryPath);
         }
+
+
+        private string CreatePath(Entrie entrie)
+        {
+            return AddExtension(UrlToFilePAth(entrie.Request.Url), entrie);
+        }
+
+        private string UrlToFilePAth(string url)
+        {
+            var uriPath = new Uri(url);
+
+            var localPath = new string[2 + uriPath.Segments.Length];
+            localPath[0] = path;
+
+            localPath[1] = uriPath.Host;
+            for (int i = 0; i < uriPath.Segments.Length; i++)
+            {
+                var segment = uriPath.Segments[i].Replace('/', '\\');
+                if (uriPath.Segments[i].Length > 30)
+                    segment = segment.Substring(0, 30);
+                localPath[2 + i] = segment;
+            }
+
+            return String.Join("\\", localPath);
+        }
+
+
+        private string AddExtension(string filePath, Entrie entrie)
+        {
+            if (Path.GetExtension(filePath) != String.Empty)
+                return filePath;
+
+            var fileName = CreateFileName(entrie);
+
+            if (fileName == String.Empty)
+                return String.Empty;
+
+            return filePath + fileName;
+        }
+
 
         private string CreateFileName(Entrie entrie)
         {
@@ -191,36 +226,18 @@ namespace HarSaver
             File.WriteAllText(path, content, Encoding.UTF8);
         }
 
-        private string AssembleFilePath(string url)
+        private byte[] LoadFromUrl(string url)
         {
-            var uriPath = new Uri(url);
-
-            //StringBuilder localPath = new StringBuilder();
-            var localPath = new string[2 + uriPath.Segments.Length];
-            localPath[0] = path;
-
-            localPath[1] = uriPath.Host;
-            for (int i = 0; i < uriPath.Segments.Length; i++)
+            using (var myWebClient = new WebClient())
             {
-                var segment = uriPath.Segments[i].Replace('/', '\\');
-                if (uriPath.Segments[i].Length > 30)
-                    segment = segment.Substring(0, 30);
-                localPath[2 + i] = segment;
+                myWebClient.Headers["User-Agent"] = "MOZILLA/5.0 (WINDOWS NT 6.1; WOW64) APPLEWEBKIT/537.1 (KHTML, LIKE GECKO) CHROME/21.0.1180.75 SAFARI/537.1";
+
+                return myWebClient.DownloadData(url);// DownloadFile(url, filePath);
             }
 
-            return String.Join("\\", localPath);// .ToString();
+
         }
 
-        private bool AddExtension(ref string filePath, Entrie entrie)
-        {
-            if (Path.GetExtension(filePath) != String.Empty)
-                return true;
-            var fileName = CreateFileName(entrie);
-            if (fileName == String.Empty)
-                return false;
-            filePath += fileName;
-            return true;
-        }
         #endregion
     }
 }
