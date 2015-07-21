@@ -67,8 +67,8 @@ namespace HarSaver
 
                     filePath = CreatePath(entrie);
                     CreateDirectory(filePath);
-                    if (filePath == String.Empty)
-                        filePath = path + "\\" + entrie.Time;
+                    if (String.IsNullOrEmpty(filePath))
+                        filePath = Path.Combine( path , Convert.ToString(entrie.Time));
 
                     File.WriteAllBytes(filePath, data);
                 }
@@ -121,7 +121,7 @@ namespace HarSaver
         {
             var filePath = CreatePath(entrie);
 
-            if (filePath == String.Empty)
+            if (String.IsNullOrEmpty(filePath))
                 return false;
 
             CreateDirectory(filePath);
@@ -156,24 +156,24 @@ namespace HarSaver
             localPath[1] = uriPath.Host;
             for (int i = 0; i < uriPath.Segments.Length; i++)
             {
-                var segment = uriPath.Segments[i].Replace('/', '\\');
+                var segment = uriPath.Segments[i].Trim('/');
                 if (uriPath.Segments[i].Length > 30)
                     segment = segment.Substring(0, 30);
                 localPath[2 + i] = segment;
             }
 
-            return String.Join("\\", localPath);
+            return  Path.Combine(localPath);
         }
 
 
         private string AddExtension(string filePath, Entrie entrie)
         {
-            if (Path.GetExtension(filePath) != String.Empty)
+            if (!String.IsNullOrEmpty(Path.GetExtension(filePath)))
                 return filePath;
 
             var fileName = CreateFileName(entrie);
 
-            if (fileName == String.Empty)
+            if (String.IsNullOrEmpty(fileName))
                 return String.Empty;
 
             return filePath + fileName;
